@@ -1,0 +1,12 @@
+$ ../fetegeoc -a -c gb geo Washington uk
+Name: Washington
+Latitude: 54.9
+Longitude: -1.5166667
+PP: Washington, Greater London
+Dangling text:
+
+Name: Washington
+Latitude: 50.9048731404
+Longitude: -0.406494140625
+PP: Washington, West Sussex
+Dangling text:

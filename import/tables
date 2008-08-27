@@ -1,0 +1,73 @@
+-- One day this might include iso639-3 or iso639-4 codes, but that will need language groups, which
+-- don't currently seem to be easily available.
+
+CREATE TABLE lang (
+  id bigserial,
+  iso639_1 text,
+  iso639_3 text,
+  iso_name text
+) ;
+
+CREATE INDEX lang_id_idx ON lang (id);
+CREATE INDEX lang_iso639_1_idx ON lang (iso639_1);
+
+CREATE TABLE country (
+  id bigserial,
+  iso2 char(2),
+  iso3 char(3)
+) ;
+
+CREATE INDEX country_id_idx ON country (id);
+CREATE INDEX country_iso2_idx ON country (iso2);
+
+--remeber these may differ from the iso code, eg 'GB'
+CREATE TABLE country_name (
+  id bigserial,
+  country_id bigint,
+  lang_id bigint,
+  is_official boolean, -- true if this is the "official" name for this country in the given language.
+  name text,
+  name_lwdh bigint -- the hash of the last word in 'name'
+) ;
+
+CREATE INDEX country_name_lwdh_idx ON country_name (name_lwdh);
+
+CREATE TABLE place (
+  id bigserial,
+  geonames_id bigint,
+  country_id bigint, -- could be null? not yet
+  parent_id bigint, -- can be null
+  lat double precision,
+  long double precision,
+  type int,
+  population bigint
+) ;
+
+CREATE INDEX place_id_idx ON place (id);
+CREATE INDEX place_geonames_id_idx ON place (geonames_id); -- Particularly needed during import.
+CREATE INDEX place_country_id_idx ON place (country_id);
+
+CREATE table place_name (
+  place_id bigint,
+  lang_id bigint,
+  name text,
+  name_hash bigint,
+  is_official boolean
+) ;
+
+CREATE INDEX place_name_feature_id ON place_name (place_id);
+CREATE INDEX place_name_hash_idx ON place_name (name_hash);
+
+CREATE TABLE postcode (
+  id bigserial,
+  country_id bigint,
+  main text, -- Main part of the postcode e.g. NW1V
+  sup text,  -- Supplementary part of the postcode e.g. 4DB
+  lat double precision,
+  long double precision,
+  area_pp text -- Pretty-printed version of the area e.g. "San Francisco CA"
+) ;
+
+CREATE INDEX postcode_country_id_idx ON postcode (country_id);
+CREATE INDEX postcode_main_idx ON postcode (lower(main));
+CREATE INDEX postcode_sup_idx ON postcode (lower(sup));

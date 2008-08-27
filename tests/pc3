@@ -1,0 +1,5 @@
+# There is no BA21 4AA in the database, so see if it falls back onto BA21 4 properly.
+$ ../fetegeoc geo BA21 4AA
+Latitude: 50.945483
+Longitude: -2.629155
+PP: BA21 4, United Kingdom

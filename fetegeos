@@ -1,0 +1,225 @@
+#! /usr/bin/env python
+
+# Copyright (C) 2008 Laurence Tratt http://tratt.net/laurie/
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+# IN THE SOFTWARE.
+
+
+import re, socket, SocketServer, sys, xml.dom.minidom as minidom
+
+try:
+    import psycopg2 as dbmod
+except ImportError:
+    import pgdb as dbmod
+
+
+import Geo.Queryier
+
+
+
+
+_DEFAULT_HOST = ""
+_DEFAULT_PORT = 8263
+
+_RE_QUERY_END = re.compile("</(?:geo|country)query>")
+
+_RE_TRUE = re.compile("true")
+_RE_FALSE = re.compile("false")
+
+_SOCK_BUF = 1024
+
+
+
+
+class Fetegeos_Handler(SocketServer.BaseRequestHandler):
+
+    def __init__(self, req, client_addr, server):
+
+        if dbmod.threadsafety == 2 or dbmod.threadsafety == 3:
+            # Connections can be shared between threads safely, so reuse the main server connection.
+            self._db = server.db
+        else:
+            # Connections can't be shared between threads safely, so for every thread we have to
+            # make a new connection.
+            self._db = dbmod.connect(user="root", database="fetegeo")
+
+        SocketServer.BaseRequestHandler.__init__(self, req, client_addr, server)
+
+
+
+    def _error(self, msg):
+
+        self.request.send("<error>%s</error>" % msg)
+        self.request.close()
+        # We now kill this thread only.
+        sys.exit(0)
+
+
+
+    def handle(self):
+
+        buf = ""
+        while True:
+            data = self.request.recv(_SOCK_BUF)
+            buf += data
+            m = _RE_QUERY_END.search(buf)
+            if m is not None:
+                break
+
+        self._dom = minidom.parseString(buf)
+
+        q_type = self._dom.firstChild.tagName.lower()
+        if q_type == "geoquery":
+            self._q_geo()
+        elif q_type == "countryquery":
+            self._q_ctry()
+        else:
+            self._error("Unknown query type '%s'." % n.tagName)
+            return
+
+
+
+    def _get_qe(self, name, default=None):
+
+        r = self._dom.getElementsByTagName(name)
+        if len(r) == 0:
+            return default
+        elif len(r) == 1:
+            assert len(r[0].childNodes) == 1
+            return r[0].childNodes[0].data
+        else:
+            XXX
+
+
+
+    def _get_country_id(self, iso):
+
+        c = self._db.cursor()
+        c.execute("SELECT id FROM country WHERE iso2=%(iso)s OR iso3=%(iso)s", dict(iso=iso.upper()))
+        assert c.rowcount < 2
+        if c.rowcount == 1:
+            return c.fetchone()[0]
+
+        return None
+
+
+
+    def _get_lang_ids(self):
+
+        c = self._db.cursor()
+        r = self._dom.getElementsByTagName("lang")
+        lang_ids = []
+        for e in r:
+            iso639_1 = e.childNodes[0].data
+            c.execute("SELECT id FROM lang WHERE iso639_1=%(iso639_1)s", dict(iso639_1=iso639_1))
+            assert c.rowcount < 2
+            if c.rowcount == 0:
+                self._error("Unknown language '%s'." % e.childNodes[0].data)
+            lang_ids.append(c.fetchone()[0])
+
+        return lang_ids
+
+
+
+    def _q_geo(self):
+
+        fa_txt = self._dom.firstChild.getAttribute("find_all")
+        if _RE_TRUE.match(fa_txt):
+            find_all = True
+        elif _RE_FALSE.match(fa_txt):
+            find_all = False
+        else:
+            self._error("Unknown value '%s' for find_all attribute." % ra_txt)
+
+        ad_txt = self._dom.firstChild.getAttribute("allow_dangling")
+        if _RE_TRUE.match(ad_txt):
+            allow_dangling = True
+        elif _RE_FALSE.match(ad_txt):
+            allow_dangling = False
+        else:
+            self._error("Unknown value '%s' for allow_dangling attribute." % ra_txt)
+
+        lang_ids = self._get_lang_ids()
+        country_iso = self._get_qe("country")
+        if country_iso is None:
+            country_id = None
+        else:
+            country_id = self._get_country_id(country_iso)
+        qs = self._get_qe("qs")
+        results = self.server.queryier.name_to_lat_long(self._db, lang_ids, find_all, \
+          allow_dangling, qs, country_id)
+
+        self.request.sendall("<results>\n%s\n</results>" % "\n".join([x.to_xml().encode("utf-8") for x in results]))
+
+        self.request.close()
+
+
+
+    def _q_ctry(self):
+
+        lang_ids = self._get_lang_ids()
+
+        qs = self._get_qe("qs")
+
+        c = self._db.cursor()
+        c.execute("SELECT id FROM country WHERE iso2=%(qs)s OR iso3=%(qs)s", dict(qs=qs.upper()))
+        assert c.rowcount < 2
+        if c.rowcount == 1:
+            cntry_id = c.fetchone()[0]
+        else:
+            # No match found.
+            self.request.send("<country></country>")
+            return
+
+        c.execute("""SELECT name FROM country_name
+          WHERE country_id=%(cntry_id)s AND lang_id=%(lang_id)s AND is_official=TRUE""",
+          dict(cntry_id=cntry_id, lang_id=lang_ids[0]))
+        assert c.rowcount == 1
+
+        self.request.sendall("<result><country><name>%s</name></country></result>" % c.fetchone()[0])
+
+        self.request.close()
+
+
+
+
+
+class Fetegeos_Server(SocketServer.TCPServer, SocketServer.ThreadingMixIn):
+
+    def __init__(self, addr, rhc):
+    
+        self.allow_reuse_address = True # XXX
+    
+        SocketServer.TCPServer.__init__(self, addr, rhc)
+        
+        self.queryier = Geo.Queryier.Queryier()
+        
+        if dbmod.threadsafety == 2 or dbmod.threadsafety == 3:
+            # Connections can be shared between threads safely so we connect only once.
+            self.db = dbmod.connect(user="root", database="fetegeo")
+
+
+
+
+if __name__ == "__main__":
+    s = Fetegeos_Server((_DEFAULT_HOST, _DEFAULT_PORT), Fetegeos_Handler)
+    try:
+        s.serve_forever()
+    except KeyboardInterrupt:
+        pass

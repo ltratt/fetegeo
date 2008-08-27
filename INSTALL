@@ -1,0 +1,29 @@
+To install Fetegeo you need to have Python installed (tested with 2.5.2) and
+a database and database connector. Currently only PostgreSQL is supported;
+any DB API compatible database connector (e.g. PyGreSQL) should work.
+
+To install, copy Fetegeo to your desired location. You then need to populate
+the database. Assuming you have a PostgreSQL database up and run the
+following two commands:
+
+  $ cd import
+  $ ./postgres_geonames.sh
+
+are the easiest way to import data. Note that running "postgres_geonames.sh"
+will create a database called fetegeo (and will wipe a database of that name
+if it exists). Importing the data is likely to take many hours; however you
+can start testing with incomplete data as soon as Fetegeo has imported a
+couple of countries worth of data.
+
+The easiest way to test things is to run the server fetegeos in one shell:
+
+  $ ./fetegeos
+
+and in another shell run either the test suite:
+
+  $ cd tests
+  $ python testall.py
+
+or use the command-line client fetegeoc:
+
+  $ fetegeoc geo <place name>

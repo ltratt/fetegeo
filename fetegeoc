@@ -1,0 +1,262 @@
+#! /usr/bin/env python
+
+# Copyright (C) 2008 Laurence Tratt http://tratt.net/laurie/
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+# IN THE SOFTWARE.
+
+
+import getopt, socket, sys, xml.dom.minidom as minidom
+
+
+
+
+_VERSION = "0.1"
+
+_DEFAULT_HOST = "127.0.0.1"
+_DEFAULT_PORT = 8263
+_DEFAULT_LANG = "en" # English
+
+_Q_GEO = 0
+_Q_CTRY = 1
+
+_TAG_LONG_NAMES = {"dangling" : "Dangling text", "place" : "Place", "id" : "ID", "name" : "Name", \
+  "lat" : "Latitude", "long" : "Longitude", "country_id" : "Country ID", "parent_id" : "Parent ID", \
+  "population" : "Population", "pp" : "PP"}
+
+
+_SHORT_USAGE_MSG = """Usage:
+  * fetegeoc [-l <lang>] [-s <host>] [-p <port>] country <query string>
+  * fetegeoc [-a] [-c <country>] [-s <host>] [-p <port>] [-l <lang>]
+    geo <query string>
+"""
+       
+_LONG_USAGE_MSG = _SHORT_USAGE_MSG + """
+  -a If -c is specified, find all matches, not just those in the host
+     country.
+
+  -c Bias the search to the specified country (specified as an ISO2 or ISO3
+     code).
+
+  -l Specify the preferred language(s) for results to be returned in.
+     Multiple -l options can be specifed; they will be treated in descending
+     order of preference.
+"""
+
+
+
+
+class Fetegeoc:
+
+    def __init__(self):
+    
+        self._parse_args()
+
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            self._sock.connect((self._host, self._port))
+        except socket.error, e:
+            sys.stderr.write("Error: %s.\n" % e[1])
+            sys.exit(1)
+
+        if self._q_type == _Q_GEO:
+            self._q_geo()
+        elif self._q_type == _Q_CTRY:
+            self._q_ctry()
+        else:
+            XXX
+
+
+
+    def _parse_args(self):
+
+        try:
+            opts, args = getopt.getopt(sys.argv[1:], 'ac:dhl:s:p:')
+        except getopt.error, e:
+            self._usage(str(e), code=1)
+
+        self._find_all = False
+        self._country = None
+        self._allow_dangling = False
+        self._host = _DEFAULT_HOST
+        self._port = _DEFAULT_PORT
+        self._langs = []
+        for opt, arg in opts:
+            if opt == "-a":
+                self._find_all = True
+            elif opt == "-c":
+                if self._country is not None:
+                    self._usage("Only one -c argument can be specified.")
+                self._country = arg
+            elif opt == "-d":
+                self._allow_dangling = True
+            elif opt == "-h":
+                self._usage(long_help=True)
+            elif opt == "-v":
+                print _VERSION
+                sys.exit(0)
+            elif opt == "-l":
+                self._langs.append(arg)
+            elif opt == "-s":
+                self._host = arg
+            elif opt == "-p":
+                try:
+                    self._port = int(arg)
+                except ValueError:
+                    self._usage("Invalid port number '%s'." % arg)
+
+        if self._find_all and self._country is None:
+            self._usage("-a makes no sense without -c.")
+
+        if len(self._langs) == 0:
+            self._langs.append(_DEFAULT_LANG)
+
+        if len(args) < 2:
+            self._usage("Not enough arguments.")
+        self._q_str = " ".join(args[1:])
+
+        if args[0] == "geo":
+            self._q_type = _Q_GEO
+        elif args[0] == "country":
+            self._q_type = _Q_CTRY
+        else:
+            self._usage("Unknown query type '%s'." % args[0])
+
+
+
+    def _usage(self, error_msg="", code=0, long_help=False):
+
+        if error_msg != "":
+            sys.stderr.write("Error: %s\n" % error_msg)
+
+        if long_help:
+            sys.stderr.write(_LONG_USAGE_MSG)
+        else:
+            sys.stderr.write(_SHORT_USAGE_MSG)
+        sys.exit(code)
+
+
+
+    def _pump_sock(self):
+    
+        buf = []
+        while True:
+            s = self._sock.recv(4096)
+            if len(s) == 0:
+                break
+            buf.append(s)
+
+        return "".join(buf)
+
+
+
+    def _elem_pp(self, e, indent_level):
+
+        sys.stdout.write("  " * indent_level)
+        if len(e.childNodes) > 0:
+            print "%s: %s" % (_TAG_LONG_NAMES[e.tagName], repr(e.childNodes[0].data)[2:-1])
+        else:
+            print "%s:" % _TAG_LONG_NAMES[e.tagName]
+
+
+
+    def _q_geo(self):
+
+        if self._find_all:
+            fa_txt = "true"
+        else:
+            fa_txt = "false"
+
+        if self._allow_dangling:
+            ad_txt = "true"
+        else:
+            ad_txt = "false"
+
+        langs = "\n".join(["<lang>%s</lang>" % x for x in self._langs])
+        if self._country is None:
+            country = ""
+        else:
+            country = "<country>%s</country>\n" % self._country
+
+        self._sock.sendall("""
+        <geoquery version="1" find_all="%s" allow_dangling="%s">
+        %s%s
+        <qs>%s</qs>
+        </geoquery>""" % (fa_txt, ad_txt, langs, country, self._q_str))
+        
+        buf = self._pump_sock()
+        d = minidom.parseString(buf)
+
+        i = 0
+        for result in d.firstChild.childNodes:
+            if isinstance(result, minidom.Text):
+                continue
+
+            dangling = result.getElementsByTagName("dangling")[0]
+            place = result.getElementsByTagName("place")
+            if len(place) == 0:
+                place = result.getElementsByTagName("postcode")
+            assert len(place) > 0
+            place = place[0]
+
+            if i > 0:
+                print
+            print "Match #%d" % (i + 1)
+
+            j = 0
+            for e in place.childNodes:
+                if isinstance(e, minidom.Text):
+                    continue
+                j += 1
+                self._elem_pp(e, 1)
+
+            self._elem_pp(dangling, 1)
+
+            i += 1
+
+        if i == 0:
+            sys.stderr.write("No match found.\n")
+            sys.exit(1)
+
+
+
+    def _q_ctry(self):
+
+        langs = "\n".join(["<lang>%s</lang>" % x for x in self._langs])
+        self._sock.sendall("""<countryquery version="1">
+        %s
+        <qs>%s</qs>
+        </countryquery>""" % (langs, self._q_str))
+
+        d = minidom.parseString(self._pump_sock())
+        if len(d.firstChild.childNodes) == 0:
+            sys.stderr.write("No such country.\n")
+            sys.exit(1)
+        else:
+            i = 0
+            for e in d.firstChild.firstChild.childNodes:
+                if i > 0:
+                    print
+                i += 1
+                self._elem_pp(e, 0)
+
+
+
+
+if __name__ == "__main__":
+    Fetegeoc()
