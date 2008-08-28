@@ -81,7 +81,8 @@ def postcode_match(ft, i):
 
     # We now try and match a "full postcode" (e.g. of the form SW1 2AA). Because we only have partial
     # UK postcode data, we first of all try matching exactly what is given, gradually backing off if
-    # that isn't possible.
+    # that isn't possible. Since all of these matches are against the same string, as soon as we find
+    # a match, we don't try searching any further.
 
     c = ft.db.cursor()
     c.execute("""SELECT * FROM postcode
@@ -97,6 +98,7 @@ def postcode_match(ft, i):
         match = Results.RPost_Code(fst[cols_map["id"]], fst[cols_map["country_id"]], 
           fst[cols_map["lat"]], fst[cols_map["long"]], pp)
         yield match, i - 2
+        return
 
     # Try matching the main part of the postcode and the first character of the supplementary
     # part. e.g. for AA9A 9AA try matching AA9A 9.
@@ -115,6 +117,7 @@ def postcode_match(ft, i):
         match = Results.RPost_Code(fst[cols_map["id"]], fst[cols_map["country_id"]],
           fst[cols_map["lat"]], fst[cols_map["long"]], pp)
         yield match, i - 2
+        return
 
     # Now we're struggling - try matching the main part of the postcode and ignore the supplementary
     # part. This will probably return multiple matches.
