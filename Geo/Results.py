@@ -63,13 +63,13 @@ class RPlace:
     def __init__(self, id, name, lat, long, country_id, parent_id, population, pp):
 
         self.id = id
-        self.name = name.decode("utf-8")
+        self.name = name
         self.lat = lat
         self.long = long
         self.country_id = country_id
         self.parent_id = parent_id
         self.population = population
-        self.pp = pp.decode("utf-8")
+        self.pp = pp
 
 
 
@@ -96,11 +96,11 @@ class RPlace:
             population_txt = ""
     
         return u"""<place>
-<id>%s</id>
+<id>%d</id>
 <name>%s</name>%s%s
 <country_id>%s</country_id>%s%s
 <pp>%s</pp>
-</place>""" % (str(self.id), self.name, lat_txt, long_txt, self.country_id,
+</place>""" % (self.id, self.name, lat_txt, long_txt, self.country_id,
                parent_id_txt, population_txt, self.pp)
 
 
@@ -114,7 +114,7 @@ class RPost_Code:
         self.country_id = country_id
         self.lat = lat
         self.long = long
-        self.pp = pp.decode("utf-8")
+        self.pp = pp
         self.dangling = ""
 
 
@@ -122,9 +122,9 @@ class RPost_Code:
     def to_xml(self):
     
         return u"""<postcode>
-<id>%s</id>
+<id>%d</id>
 <country_id>%s</country_id>
 <lat>%s</lat>
 <long>%s</long>
 <pp>%s</pp>
-</postcode>""" % (str(self.id), str(self.country_id), str(self.lat), str(self.long), self.pp)
+</postcode>""" % (self.id, str(self.country_id), str(self.lat), str(self.long), self.pp)
