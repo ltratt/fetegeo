@@ -150,7 +150,7 @@ class Queryier:
                   WHERE place_id=%(place_id)s AND lang_id=%(lang_id)s""",
                   dict(place_id=place_id, lang_id=lang_id))
 
-            if c.rowcount == 1:
+            if c.rowcount > 0:
                 name = c.fetchone()[0]
                 self.place_name_cache[cache_key] = name
                 return name
