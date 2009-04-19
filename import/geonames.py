@@ -241,7 +241,10 @@ for l in codecs.EncodedFile(f, "utf-8"):
         name=r[1]
         asciiname=r[2]
 
-    # Admin2 IDs are of the form "GB.ENG.M3" and so on.
+    # Admin2 IDs are of the form "GB.ENG.M3" and so on. Any that aren't are considered invalid.
+    if len(r[0].split(".")[0]) != 2:
+        print "Admin2 area with incorrect Admin1 code:", r
+        continue
     country_id = countries_map[r[0][:2]]
     admin1_code = r[0][:r[0].index(".", r[0].index(".") + 1)]
     if not admin1_map.has_key(admin1_code):
