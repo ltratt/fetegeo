@@ -3,8 +3,16 @@ a database and database connector. Currently only PostgreSQL is supported;
 any DB API compatible database connector (e.g. PyGreSQL) should work.
 
 To install, copy Fetegeo to your desired location. You then need to populate
-the database. Assuming you have a PostgreSQL database up and run the
-following two commands:
+the database. If you do not have a PostgreSQL database up and running you can
+create one with:
+
+  $ initdb -D data
+
+where 'data' is the name of a directory (which PostgreSQL will create) and
+which will be the database store.
+
+Assuming you have a PostgreSQL database up and running the following two
+commands:
 
   $ cd import
   $ ./postgres_geonames.sh
