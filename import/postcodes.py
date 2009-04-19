@@ -51,7 +51,7 @@ c = db.cursor()
 print "===> Importing UK postcodes"
 
 uk_id = get_country_id("GB")
-f = urllib.urlopen("http://www.npemap.org.uk/data/currentlist")
+f = urllib.urlopen("http://www.npemap.org.uk/data/fulllist")
 for l in codecs.EncodedFile(f, "utf-8"):
     if l[0] == "#":
         continue
