@@ -1,25 +1,22 @@
-To install Fetegeo you need to have Python installed (tested with 2.5.2) and
+============================================================================
+  Fetegeo Installation Guide
+============================================================================
+
+
+To install Fetegeo you need to have Python installed (tested with 2.5.4) and
 a database and database connector. Currently only PostgreSQL is supported;
 any DB API compatible database connector (e.g. PyGreSQL) should work.
 
 To install, copy Fetegeo to your desired location. You then need to populate
-the database. If you do not have a PostgreSQL database up and running you can
-create one with:
-
-  $ initdb -D data
-
-where 'data' is the name of a directory (which PostgreSQL will create) and
-which will be the database store.
-
-Assuming you have a PostgreSQL database up and running the following two
-commands:
+the database. Assuming you have a PostgreSQL database up and running the
+following two commands:
 
   $ cd import
   $ ./postgres_geonames.sh
 
 are the easiest way to import data. Note that running "postgres_geonames.sh"
 will create a database called fetegeo (and will wipe a database of that name
-if it exists). Importing the data is likely to take many hours; however you
+if it exists). Importing the data is likely to take a while; however you
 can start testing with incomplete data as soon as Fetegeo has imported a
 couple of countries worth of data.
 
@@ -35,3 +32,28 @@ and in another shell run either the test suite:
 or use the command-line client fetegeoc:
 
   $ fetegeoc geo <place name>
+
+
+
+  PostgreSQL tips
+ ===============
+
+If you do not have a PostgreSQL database up and running you can create one
+with:
+
+  $ initdb -D data
+
+where 'data' is the name of a directory (which PostgreSQL will create) and
+which will be the database store.
+
+Postgres's default settings can make importing data cripplingly slow (with
+imports taking many hours). Fiddling with the options in the
+data/postgresql.conf file can make a huge difference. On a 2Gb machine, for
+example, I set the following options for import:
+
+  shared_buffers = 512MB
+  checkpoint_segments = 50
+  effective_cache_size = 768MB
+
+During normal operation, these aren't anywhere near as important, but for
+import they lead to a big speedup.
