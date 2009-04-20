@@ -301,9 +301,12 @@ name_sql = """INSERT INTO place_name (place_id, lang_id, name, name_hash, is_off
 
 c.execute("SELECT nextval('place_id_seq')");
 place_id = c.fetchone()[0]
+i = 0
 for iso2 in countries_map.keys():
-    sys.stdout.write("===> Processing %s data... downloading... " % iso2)
+    sys.stdout.write("===> [%d%%] Processing %s data... downloading... " % ((i * (100.0/len(countries_map)), iso2)))
     sys.stdout.flush()
+    i += 1
+
     cn_path = imputils.zipex("http://download.geonames.org/export/dump/%s.zip" % iso2, "%s.txt" % iso2)
     
     sys.stdout.write("collating... ")
