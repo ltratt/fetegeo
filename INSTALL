@@ -20,6 +20,12 @@ if it exists). Importing the data is likely to take a while; however you
 can start testing with incomplete data as soon as Fetegeo has imported a
 couple of countries worth of data.
 
+fetegeos is the Fetegeo server. In order to set this up, you need to give it
+a valid config file. A sample config file is included with the distribution
+and can be moved into place with:
+
+  $ cp fetegeos.conf.sample fetegeos.conf
+
 The easiest way to test things is to run the server fetegeos in one shell:
 
   $ ./fetegeos

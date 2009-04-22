@@ -21,7 +21,7 @@
 # IN THE SOFTWARE.
 
 
-import re, socket, SocketServer, sys, xml.dom.minidom as minidom
+import imp, re, os, socket, SocketServer, sys, xml.dom.minidom as minidom
 
 try:
     import psycopg2 as dbmod
@@ -38,6 +38,9 @@ import Geo.Queryier
 
 _DEFAULT_HOST = ""
 _DEFAULT_PORT = 8263
+
+_CONF_DIRS = ["/etc/", sys.path[0]]
+_CONF_LEAF = "fetegeos.conf"
 
 _RE_QUERY_END = re.compile("</(?:geo|country)query>")
 
@@ -210,8 +213,28 @@ class Fetegeos_Server(SocketServer.TCPServer, SocketServer.ThreadingMixIn):
 
     def __init__(self, addr, rhc):
     
-        self.allow_reuse_address = True # XXX
+        # Load the config file
     
+        for dir in _CONF_DIRS:
+            conf_path = os.path.join(dir, _CONF_LEAF)
+            if os.path.exists(conf_path):
+                break
+        else:
+            sys.stderr.write("Error: No config file found.")
+            sys.exit(1)
+        
+        f = open(conf_path, "r")
+        # We fool load_source by pretending the config file comes from /dev/null,
+        # which (because it's a filename without a "." in it, but which is
+        # genuinely present) stops it trying to write a .pyc file. Otherwise for
+        # a file fetegeos.conf, one ends up with a fetegeos.confc file, which is
+        # plain ugly.
+        self._config = imp.load_source("config", "/dev/null", f)
+        f.close()
+    
+        # Setup the server
+    
+        self.allow_reuse_address = True # XXX
         SocketServer.TCPServer.__init__(self, addr, rhc)
         
         self.queryier = Geo.Queryier.Queryier()
@@ -223,6 +246,29 @@ class Fetegeos_Server(SocketServer.TCPServer, SocketServer.ThreadingMixIn):
                 self.db.set_client_encoding('utf-8')
             except:
                 pass
+
+
+    def verify_request(self, requst, client_address):
+    
+        # Check that client_address is an IP address allowed to connect to fetegeos.
+        # NOTE: This is rather IP4 specific at the moment.
+    
+        split_client_address = client_address[0].split(".")
+        for addr in self._config.accept_connect:
+            split_addr = addr.split(".")
+            if len(split_addr) == len(split_client_address):
+                match = True
+                for i in range(len(split_addr)):
+                    if split_addr[i] == "*":
+                        continue
+                    elif split_addr[i] != split_client_address[i]:
+                        match = False
+                        break
+                
+                if match:
+                    return True
+
+        return False
 
 
 
