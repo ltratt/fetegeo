@@ -110,7 +110,10 @@ print "===> Importing language codes"
 langs_map = {}
 f = urllib.urlopen("http://download.geonames.org/export/dump/iso-languagecodes.txt")
 for l in codecs.EncodedFile(f, "utf-8"):
-    iso639_3, iso639_2, iso639_1, iso_name = l.strip().split("\t")
+    sp = l.strip().split("\t")
+    if len(sp) != 4:
+        continue
+    iso639_3, iso639_2, iso639_1, iso_name = sp
     if iso_name == "Language Name":
         continue
 
