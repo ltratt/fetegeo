@@ -191,7 +191,7 @@ print "===> Importing admin1 areas"
 # Unfortunately this isn't uniform. For example UK counties are in both Admin1 and Admin2. I can't
 # explain why.
 
-f = urllib.urlopen("http://download.geonames.org/export/dump/admin1Codes.txt")
+f = urllib.urlopen("http://download.geonames.org/export/dump/admin1CodesASCII.txt")
 admin1_map = {}
 for l in codecs.EncodedFile(f, "utf-8"):
     r = [x.strip() for x in l.split("\t")]
